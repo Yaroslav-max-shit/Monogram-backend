@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = False
 
     # CORS
-    CORS_ORIGINS_STR: str = "https://f1w6ggb2-5173.euw.devtunnels.ms/"
+    CORS_ORIGINS_STR: str = "https://monograme.netlify.app/"
 
     @property
     def CORS_ORIGINS(self) -> List[str]:
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
         {"urls": "stun:stun1.l.google.com:19302"},
     ]
 
-    FRONTEND_URL: str = "https://f1w6ggb2-5173.euw.devtunnels.ms/"
+    FRONTEND_URL: str = "https://monograme.netlify.app/"
 
     # JWT Cookie
     JWT_COOKIE_NAME: str = "access_token"

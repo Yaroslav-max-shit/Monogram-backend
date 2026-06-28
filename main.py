@@ -879,8 +879,8 @@ if __name__ == "__main__":
     logger.info(" ЗАПУСК MONOGRAM СЕРВЕРА")
     logger.info("=" * 50)
     logger.info(f" Путь: {backend_dir}")
-    logger.info(f" API: https://f1w6ggb2-8000.euw.devtunnels.ms/")
-    logger.info(f" Health: https://f1w6ggb2-8000.euw.devtunnels.ms/api/health")
+    logger.info(f" API: https://monogram-backend-dxv4.onrender.com/")
+    logger.info(f" Health: https://monogram-backend-dxv4.onrender.com/api/health")
     logger.info("=" * 50)
     uvicorn.run(
         "main:app",

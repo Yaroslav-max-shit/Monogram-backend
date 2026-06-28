@@ -685,7 +685,7 @@ async def google_callback(code: str, request: Request, db: Session = Depends(get
         "code": code,
         "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
         "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-        "redirect_uri": f"{os.getenv('BACKEND_PUBLIC_URL', 'https://f1w6ggb2-8000.euw.devtunnels.ms').rstrip('/')}/auth/google/callback",
+        "redirect_uri": f"{os.getenv('BACKEND_PUBLIC_URL', 'https://monogram-backend-dxv4.onrender.com').rstrip('/')}/auth/google/callback",
         "grant_type": "authorization_code"
     }
     
@@ -790,7 +790,7 @@ async def yandex_login(request: Request):
     yandex_client_id = os.getenv("YANDEX_CLIENT_ID", "")
     if not yandex_client_id:
         raise HTTPException(500, "YANDEX_CLIENT_ID not configured")
-    backend_url = os.getenv('BACKEND_PUBLIC_URL', 'https://f1w6ggb2-8000.euw.devtunnels.ms').rstrip('/')
+    backend_url = os.getenv('BACKEND_PUBLIC_URL', 'https://monogram-backend-dxv4.onrender.com').rstrip('/')
     callback_url = f"{backend_url}/auth/yandex/callback"
     yandex_url = f"https://oauth.yandex.ru/authorize?response_type=code&client_id={yandex_client_id}&redirect_uri={callback_url}"
     return RedirectResponse(url=yandex_url)
