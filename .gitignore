@@ -1,0 +1,52 @@
+# --- Артефакты сборки (PyInstaller) ---
+# Эти папки у тебя вызывают кучу предупреждений про CRLF/LF — их не должно быть в Git
+build/
+dist/
+*.spec
+*.toc
+*.pyz
+
+# --- Логи и метрики ---
+logs/
+*.log
+*.jsonl
+
+# --- Загруженные файлы (пользовательский контент) ---
+uploads/
+
+# --- Виртуальное окружение и кэш Python ---
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# --- Переменные окружения и секреты ---
+.env
+.env.*
+!.env.example          # если есть пример .env.example — его можно оставить в репо
+
+# --- IDE и редакторы ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Node.js (на всякий случай, раз у тебя фронтенд тоже есть) ---
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# --- Тестовый кэш и покрытие ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Системные файлы ОС ---
+.DS_Store
+Thumbs.db
+Desktop.ini

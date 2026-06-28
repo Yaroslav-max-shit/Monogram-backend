@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monogram Bot API</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.6; }
+  .header { background: linear-gradient(135deg, #1f6feb, #58a6ff); padding: 48px 24px; text-align: center; }
+  .header h1 { font-size: 2.5em; margin-bottom: 8px; }
+  .header p { color: rgba(255,255,255,0.85); font-size: 1.1em; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+  .section h2 { color: #58a6ff; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #30363d; }
+  .section h3 { color: #f0f6fc; margin: 20px 0 10px; }
+  .method { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .method-header { padding: 14px 18px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+  .method-header:hover { background: #1c2128; }
+  .method-name { font-family: 'SF Mono', 'Fira Code', monospace; color: #58a6ff; font-weight: 600; }
+  .method-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 0.75em; font-weight: 700; text-transform: uppercase; margin-right: 8px; }
+  .badge-get { background: #1f6feb33; color: #58a6ff; }
+  .badge-post { background: #23863633; color: #3fb950; }
+  .badge-delete { background: #da363333; color: #f85149; }
+  .method-path { font-family: 'SF Mono', 'Fira Code', monospace; color: #8b949e; font-size: 0.9em; }
+  .method-body { padding: 0 18px 18px; display: none; }
+  .method.open .method-body { display: block; }
+  pre { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 14px; overflow-x: auto; font-size: 0.9em; margin: 8px 0; }
+  code { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .param-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  .param-table th, .param-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; }
+  .param-table th { color: #8b949e; font-size: 0.85em; text-transform: uppercase; }
+  .param-table td { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9em; }
+  .type-bool { color: #79c0ff; }
+  .type-int { color: #d2a8ff; }
+  .type-str { color: #a5d6ff; }
+  .required { color: #f85149; }
+  .optional { color: #8b949e; }
+  .tabs { display: flex; gap: 4px; margin: 10px 0; }
+  .tab-btn { padding: 6px 16px; border: 1px solid #30363d; background: #0d1117; color: #8b949e; border-radius: 6px; cursor: pointer; font-size: 0.85em; }
+  .tab-btn.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .auth-box { background: linear-gradient(135deg, #1c2128, #161b22); border: 1px solid #30363d; border-radius: 8px; padding: 18px; margin: 10px 0; }
+  .auth-box code { color: #f0883e; }
+  .endpoint-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+  .endpoint-item { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px 14px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85em; }
+  .footer { text-align: center; padding: 24px; color: #8b949e; font-size: 0.85em; }
+  @media (max-width: 600px) { .header h1 { font-size: 1.8em; } .container { padding: 12px; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Monogram Bot API</h1>
+  <p>Telegram-compatible Bot API for Monogram Messenger</p>
+</div>
+
+<div class="container">
+
+<div class="section">
+  <h2>Authentication</h2>
+  <p>All Bot API requests require authentication via API key. Your bot's API key is generated when you create a bot.</p>
+  <div class="auth-box">
+    <strong>Header:</strong> <code>X-Api-Key: YOUR_API_KEY</code><br><br>
+    <strong>Query param:</strong> <code>?api_key=YOUR_API_KEY</code>
+  </div>
+  <p>Base URL: <code>/bots/api/</code></p>
+  <p>Error responses follow Telegram format:</p>
+  <pre>{"ok": false, "error_code": 400, "description": "Bad Request: ..."}</pre>
+</div>
+
+<div class="section">
+  <h2>All Methods</h2>
+  <div class="endpoint-list" id="endpointList"></div>
+</div>
+
+<div class="section">
+  <h2>Core Methods</h2>
+
+  <div class="method" data-endpoint="sendMessage">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendMessage</span></span>
+      <span class="method-path">/bots/api/sendMessage</span>
+    </div>
+    <div class="method-body">
+      <p>Send a text message to a chat.</p>
+      <h3>Parameters</h3>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Unique identifier for the target chat</td></tr>
+        <tr><td>text</td><td class="type-str">String</td><td class="required">Required</td><td>Text of the message to be sent</td></tr>
+        <tr><td>reply_to_message_id</td><td class="type-int">Integer</td><td class="optional">Optional</td><td>If the message is a reply, ID of the original message</td></tr>
+      </table>
+      <div class="tabs">
+        <div class="tab-btn active" onclick="switchTab(this, 'sendMessage-curl')">curl</div>
+        <div class="tab-btn" onclick="switchTab(this, 'sendMessage-python')">Python</div>
+        <div class="tab-btn" onclick="switchTab(this, 'sendMessage-js')">JavaScript</div>
+      </div>
+      <div id="sendMessage-curl" class="tab-content active"><pre>curl -X POST http://localhost:8000/bots/api/sendMessage \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": 123, "text": "Hello from bot!"}'</pre></div>
+      <div id="sendMessage-python" class="tab-content"><pre>import requests
+r = requests.post("http://localhost:8000/bots/api/sendMessage",
+    headers={"X-Api-Key": "YOUR_API_KEY"},
+    json={"chat_id": 123, "text": "Hello from bot!"})
+print(r.json())</pre></div>
+      <div id="sendMessage-js" class="tab-content"><pre>fetch("http://localhost:8000/bots/api/sendMessage", {
+  method: "POST",
+  headers: {"X-Api-Key": "YOUR_API_KEY", "Content-Type": "application/json"},
+  body: JSON.stringify({chat_id: 123, text: "Hello from bot!"})
+}).then(r => r.json()).then(console.log)</pre></div>
+      <h3>Response</h3>
+      <pre>{
+  "ok": true,
+  "result": {
+    "message_id": 1,
+    "from": {"id": 1, "is_bot": false, "first_name": "Owner"},
+    "chat": {"id": 123, "type": "private"},
+    "date": 1700000000,
+    "text": "Hello from bot!"
+  }
+}</pre>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="forwardMessage">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">forwardMessage</span></span>
+      <span class="method-path">/bots/api/forwardMessage</span>
+    </div>
+    <div class="method-body">
+      <p>Forward a message from one chat to another.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>from_chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Source chat</td></tr>
+        <tr><td>message_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Message ID to forward</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="copyMessage">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">copyMessage</span></span>
+      <span class="method-path">/bots/api/copyMessage</span>
+    </div>
+    <div class="method-body">
+      <p>Copy a message (without forward attribution).</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>from_chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Source chat</td></tr>
+        <tr><td>message_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Message ID to copy</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendPhoto">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendPhoto</span></span>
+      <span class="method-path">/bots/api/sendPhoto</span>
+    </div>
+    <div class="method-body">
+      <p>Send a photo. Accepts a file URL or file_id.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>photo</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+        <tr><td>caption</td><td class="type-str">String</td><td class="optional">Optional</td><td>Photo caption</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendAudio">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendAudio</span></span>
+      <span class="method-path">/bots/api/sendAudio</span>
+    </div>
+    <div class="method-body">
+      <p>Send an audio file.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>audio</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendDocument">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendDocument</span></span>
+      <span class="method-path">/bots/api/sendDocument</span>
+    </div>
+    <div class="method-body">
+      <p>Send a document file.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>document</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendVideo">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendVideo</span></span>
+      <span class="method-path">/bots/api/sendVideo</span>
+    </div>
+    <div class="method-body">
+      <p>Send a video file.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>video</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendAnimation">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendAnimation</span></span>
+      <span class="method-path">/bots/api/sendAnimation</span>
+    </div>
+    <div class="method-body">
+      <p>Send an animation (GIF).</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>animation</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendVoice">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendVoice</span></span>
+      <span class="method-path">/bots/api/sendVoice</span>
+    </div>
+    <div class="method-body">
+      <p>Send a voice message.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>voice</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendVideoNote">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendVideoNote</span></span>
+      <span class="method-path">/bots/api/sendVideoNote</span>
+    </div>
+    <div class="method-body">
+      <p>Send a video note (round video).</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>video_note</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendMediaGroup">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendMediaGroup</span></span>
+      <span class="method-path">/bots/api/sendMediaGroup</span>
+    </div>
+    <div class="method-body">
+      <p>Send a group of photos/videos (album).</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>media</td><td class="type-str">JSON Array</td><td class="required">Required</td><td>Array of media objects</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendLocation">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendLocation</span></span>
+      <span class="method-path">/bots/api/sendLocation</span>
+    </div>
+    <div class="method-body">
+      <p>Send a geographic location.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>latitude</td><td class="type-int">Float</td><td class="required">Required</td><td>Latitude</td></tr>
+        <tr><td>longitude</td><td class="type-int">Float</td><td class="required">Required</td><td>Longitude</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendVenue">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendVenue</span></span>
+      <span class="method-path">/bots/api/sendVenue</span>
+    </div>
+    <div class="method-body">
+      <p>Send a venue with location.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>latitude</td><td class="type-int">Float</td><td class="required">Required</td><td>Latitude</td></tr>
+        <tr><td>longitude</td><td class="type-int">Float</td><td class="required">Required</td><td>Longitude</td></tr>
+        <tr><td>title</td><td class="type-str">String</td><td class="required">Required</td><td>Venue name</td></tr>
+        <tr><td>address</td><td class="type-str">String</td><td class="required">Required</td><td>Venue address</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendContact">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendContact</span></span>
+      <span class="method-path">/bots/api/sendContact</span>
+    </div>
+    <div class="method-body">
+      <p>Send a phone contact.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>phone_number</td><td class="type-str">String</td><td class="required">Required</td><td>Contact phone number</td></tr>
+        <tr><td>first_name</td><td class="type-str">String</td><td class="required">Required</td><td>Contact first name</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendPoll">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendPoll</span></span>
+      <span class="method-path">/bots/api/sendPoll</span>
+    </div>
+    <div class="method-body">
+      <p>Send a poll.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>question</td><td class="type-str">String</td><td class="required">Required</td><td>Poll question</td></tr>
+        <tr><td>options</td><td class="type-str">JSON Array</td><td class="required">Required</td><td>Array of option strings</td></tr>
+        <tr><td>is_anonymous</td><td class="type-bool">Boolean</td><td class="optional">Optional</td><td>Default true</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendDice">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendDice</span></span>
+      <span class="method-path">/bots/api/sendDice</span>
+    </div>
+    <div class="method-body">
+      <p>Send a dice with random value.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>emoji</td><td class="type-str">String</td><td class="optional">Optional</td><td>Emoji type (e.g. 🎲, 🎯)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendChatAction">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendChatAction</span></span>
+      <span class="method-path">/bots/api/sendChatAction</span>
+    </div>
+    <div class="method-body">
+      <p>Send a chat action (typing, upload_photo, etc.).</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>action</td><td class="type-str">String</td><td class="required">Required</td><td>Action type (typing, upload_photo, etc.)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="sendSticker">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">sendSticker</span></span>
+      <span class="method-path">/bots/api/sendSticker</span>
+    </div>
+    <div class="method-body">
+      <p>Send a sticker.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Target chat</td></tr>
+        <tr><td>sticker</td><td class="type-str">String</td><td class="required">Required</td><td>File URL or file_id</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="getFile">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getFile</span></span>
+      <span class="method-path">/bots/api/getFile</span>
+    </div>
+    <div class="method-body">
+      <p>Get file info by file_id.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>file_id</td><td class="type-str">String</td><td class="required">Required</td><td>File identifier</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="deleteMessage">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">deleteMessage</span></span>
+      <span class="method-path">/bots/api/deleteMessage</span>
+    </div>
+    <div class="method-body">
+      <p>Delete a message.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Chat containing the message</td></tr>
+        <tr><td>message_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Message ID to delete</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="editMessageText">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">editMessageText</span></span>
+      <span class="method-path">/bots/api/editMessageText</span>
+    </div>
+    <div class="method-body">
+      <p>Edit message text.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Chat containing the message</td></tr>
+        <tr><td>message_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Message ID to edit</td></tr>
+        <tr><td>text</td><td class="type-str">String</td><td class="required">Required</td><td>New text</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="editMessageCaption">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">editMessageCaption</span></span>
+      <span class="method-path">/bots/api/editMessageCaption</span>
+    </div>
+    <div class="method-body">
+      <p>Edit media message caption.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="editMessageMedia">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">editMessageMedia</span></span>
+      <span class="method-path">/bots/api/editMessageMedia</span>
+    </div>
+    <div class="method-body">
+      <p>Edit media attachment.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="editMessageReplyMarkup">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">editMessageReplyMarkup</span></span>
+      <span class="method-path">/bots/api/editMessageReplyMarkup</span>
+    </div>
+    <div class="method-body">
+      <p>Edit inline keyboard.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="stopPoll">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">stopPoll</span></span>
+      <span class="method-path">/bots/api/stopPoll</span>
+    </div>
+    <div class="method-body">
+      <p>Stop a poll.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="answerCallbackQuery">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">answerCallbackQuery</span></span>
+      <span class="method-path">/bots/api/answerCallbackQuery</span>
+    </div>
+    <div class="method-body">
+      <p>Answer a callback query.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Chat Methods</h2>
+
+  <div class="method" data-endpoint="getChat">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getChat</span></span>
+      <span class="method-path">/bots/api/getChat</span>
+    </div>
+    <div class="method-body">
+      <p>Get chat information.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>chat_id</td><td class="type-int">Integer</td><td class="required">Required</td><td>Chat ID</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="getChatAdministrators">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getChatAdministrators</span></span>
+      <span class="method-path">/bots/api/getChatAdministrators</span>
+    </div>
+    <div class="method-body">
+      <p>Get chat administrators list.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="getChatMembersCount">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getChatMembersCount</span></span>
+      <span class="method-path">/bots/api/getChatMembersCount</span>
+    </div>
+    <div class="method-body">
+      <p>Get number of members in a chat.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="getChatMember">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getChatMember</span></span>
+      <span class="method-path">/bots/api/getChatMember</span>
+    </div>
+    <div class="method-body">
+      <p>Get information about a member of a chat.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="leaveChat">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">leaveChat</span></span>
+      <span class="method-path">/bots/api/leaveChat</span>
+    </div>
+    <div class="method-body">
+      <p>Leave a chat.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="setChatTitle">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">setChatTitle</span></span>
+      <span class="method-path">/bots/api/setChatTitle</span>
+    </div>
+    <div class="method-body">
+      <p>Set chat title.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="setChatDescription">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">setChatDescription</span></span>
+      <span class="method-path">/bots/api/setChatDescription</span>
+    </div>
+    <div class="method-body">
+      <p>Set chat description.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="pinChatMessage">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">pinChatMessage</span></span>
+      <span class="method-path">/bots/api/pinChatMessage</span>
+    </div>
+    <div class="method-body">
+      <p>Pin a message in a chat.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="unpinChatMessage">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">unpinChatMessage</span></span>
+      <span class="method-path">/bots/api/unpinChatMessage</span>
+    </div>
+    <div class="method-body">
+      <p>Unpin a message.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Bot Info & Updates</h2>
+
+  <div class="method" data-endpoint="getMe">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getMe</span></span>
+      <span class="method-path">/bots/api/getMe</span>
+    </div>
+    <div class="method-body">
+      <p>Get bot information.</p>
+      <h3>Response</h3>
+      <pre>{
+  "ok": true,
+  "result": {
+    "id": 1,
+    "is_bot": true,
+    "first_name": "MyBot",
+    "username": "MyBot",
+    "can_join_groups": true,
+    "can_read_all_group_messages": true,
+    "supports_inline_queries": false
+  }
+}</pre>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="getUpdates">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getUpdates</span></span>
+      <span class="method-path">/bots/api/getUpdates</span>
+    </div>
+    <div class="method-body">
+      <p>Get new updates (long polling).</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>offset</td><td class="type-int">Integer</td><td class="optional">Optional</td><td>Return only messages with ID > offset</td></tr>
+        <tr><td>limit</td><td class="type-int">Integer</td><td class="optional">Optional</td><td>Max number of updates (1-100, default 100)</td></tr>
+        <tr><td>timeout</td><td class="type-int">Integer</td><td class="optional">Optional</td><td>Long polling timeout in seconds</td></tr>
+      </table>
+      <div class="tabs">
+        <div class="tab-btn active" onclick="switchTab(this, 'getUpdates-curl')">curl</div>
+        <div class="tab-btn" onclick="switchTab(this, 'getUpdates-python')">Python</div>
+      </div>
+      <div id="getUpdates-curl" class="tab-content active"><pre>curl "http://localhost:8000/bots/api/getUpdates?offset=0&limit=10&timeout=30" \
+  -H "X-Api-Key: YOUR_API_KEY"</pre></div>
+      <div id="getUpdates-python" class="tab-content"><pre>import requests, time
+offset = 0
+while True:
+    r = requests.get("http://localhost:8000/bots/api/getUpdates",
+        params={"offset": offset, "timeout": 30},
+        headers={"X-Api-Key": "YOUR_API_KEY"})
+    data = r.json()
+    if data["ok"]:
+        for update in data["result"]:
+            print(update)
+            offset = update["update_id"] + 1
+    time.sleep(1)</pre></div>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="setWebhook">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">setWebhook</span></span>
+      <span class="method-path">/bots/api/setWebhook</span>
+    </div>
+    <div class="method-body">
+      <p>Set a webhook URL for receiving updates via POST.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>url</td><td class="type-str">String</td><td class="required">Required</td><td>HTTPS URL to receive updates</td></tr>
+        <tr><td>max_connections</td><td class="type-int">Integer</td><td class="optional">Optional</td><td>Maximum connections (default 40)</td></tr>
+        <tr><td>allowed_updates</td><td class="type-str">JSON Array</td><td class="optional">Optional</td><td>List of update types to receive</td></tr>
+      </table>
+      <h3>Example</h3>
+      <pre>curl -X POST http://localhost:8000/bots/api/setWebhook \
+  -H "X-Api-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/webhook"}'</pre>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="getWebhookInfo">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">getWebhookInfo</span></span>
+      <span class="method-path">/bots/api/getWebhookInfo</span>
+    </div>
+    <div class="method-body">
+      <p>Get current webhook status.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="deleteWebhook">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-delete">DELETE</span><span class="method-name">deleteWebhook</span></span>
+      <span class="method-path">/bots/api/deleteWebhook</span>
+    </div>
+    <div class="method-body">
+      <p>Remove webhook integration.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Bot Management (User API)</h2>
+  <p>These endpoints are called by the bot owner (authenticated with JWT), not by the bot itself.</p>
+
+  <div class="method" data-endpoint="create">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">Create Bot</span></span>
+      <span class="method-path">/bots/create</span>
+    </div>
+    <div class="method-body">
+      <p>Create a new bot. Requires user JWT token.</p>
+      <table class="param-table">
+        <tr><th>Field</th><th>Type</th><th></th><th>Description</th></tr>
+        <tr><td>name</td><td class="type-str">String</td><td class="required">Required</td><td>Bot display name</td></tr>
+        <tr><td>username</td><td class="type-str">String</td><td class="required">Required</td><td>Bot username (must end in Bot or _bot)</td></tr>
+        <tr><td>description</td><td class="type-str">String</td><td class="optional">Optional</td><td>Bot description</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="myBots">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-get">GET</span><span class="method-name">myBots</span></span>
+      <span class="method-path">/bots/myBots</span>
+    </div>
+    <div class="method-body">
+      <p>List all bots owned by the current user.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="regenerateKey">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">regenerateKey</span></span>
+      <span class="method-path">/bots/regenerateKey</span>
+    </div>
+    <div class="method-body">
+      <p>Regenerate bot API key.</p>
+    </div>
+  </div>
+
+  <div class="method" data-endpoint="setBotCommands">
+    <div class="method-header" onclick="toggleMethod(this)">
+      <span><span class="method-badge badge-post">POST</span><span class="method-name">setBotCommands</span></span>
+      <span class="method-path">/bots/setBotCommands</span>
+    </div>
+    <div class="method-body">
+      <p>Set bot command list.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Update Format</h2>
+  <p>Updates from getUpdates or webhook follow this structure:</p>
+  <pre>{
+  "update_id": 123,
+  "message": {
+    "message_id": 1,
+    "from": {"id": 1, "is_bot": false, "username": "user", "first_name": "User"},
+    "chat": {"id": 1, "type": "private", "title": "Chat Name"},
+    "date": 1234567890,
+    "text": "Hello"
+  }
+}</pre>
+</div>
+
+<div class="section">
+  <h2>Error Format</h2>
+  <p>All errors return a JSON response with <code>ok: false</code>:</p>
+  <pre>{"ok": false, "error_code": 400, "description": "Bad Request: chat_id and text are required"}</pre>
+  <table class="param-table">
+    <tr><th>Code</th><th>Description</th></tr>
+    <tr><td>400</td><td>Bad Request - missing or invalid parameters</td></tr>
+    <tr><td>401</td><td>Unauthorized - missing or invalid API key</td></tr>
+    <tr><td>404</td><td>Not Found - resource not found</td></tr>
+    <tr><td>429</td><td>Too Many Requests - rate limited</td></tr>
+  </table>
+</div>
+
+</div>
+
+<div class="footer">
+  Monogram Messenger Bot API &mdash; Telegram-compatible &mdash; Open Source
+</div>
+
+<script>
+function toggleMethod(el) {
+  el.parentElement.classList.toggle('open');
+}
+
+function switchTab(btn, tabId) {
+  var parent = btn.parentElement;
+  var tabs = parent.parentElement.querySelectorAll('.tab-content');
+  var btns = parent.querySelectorAll('.tab-btn');
+  btns.forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  tabs.forEach(function(t) { t.classList.remove('active'); });
+  document.getElementById(tabId).classList.add('active');
+}
+
+// Build endpoint list
+var endpoints = [
+  "sendMessage", "forwardMessage", "copyMessage",
+  "sendPhoto", "sendAudio", "sendDocument", "sendVideo", "sendAnimation",
+  "sendVoice", "sendVideoNote", "sendMediaGroup",
+  "sendLocation", "sendVenue", "sendContact", "sendPoll", "sendDice",
+  "sendChatAction", "sendSticker",
+  "getFile", "deleteMessage",
+  "editMessageText", "editMessageCaption", "editMessageMedia", "editMessageReplyMarkup",
+  "stopPoll", "answerCallbackQuery",
+  "getChat", "getChatAdministrators", "getChatMembersCount", "getChatMember",
+  "leaveChat", "setChatTitle", "setChatDescription", "setChatPhoto",
+  "pinChatMessage", "unpinChatMessage",
+  "getMe", "getUpdates", "setWebhook", "getWebhookInfo", "deleteWebhook"
+];
+
+var list = document.getElementById('endpointList');
+endpoints.forEach(function(ep) {
+  var item = document.createElement('div');
+  item.className = 'endpoint-item';
+  item.textContent = ep;
+  item.onclick = function() {
+    var el = document.querySelector('.method[data-endpoint="' + ep + '"]');
+    if (el) { el.classList.add('open'); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  };
+  item.style.cursor = 'pointer';
+  list.appendChild(item);
+});
+</script>
+</body>
+</html>
