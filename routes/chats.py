@@ -122,6 +122,8 @@ def get_user_chats(
                     if other_user.last_name:
                         name_parts.append(other_user.last_name)
                     chat_data["name"] = " ".join(name_parts) if name_parts else other_user.username
+                    if other_user.avatar_url:
+                        chat_data["avatar_url"] = other_user.avatar_url
         
         result.append(chat_data)
     
