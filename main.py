@@ -227,69 +227,54 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""
         if token_user_id != user_id:
             await websocket.close(code=4003, reason="Token user_id mismatch")
             return
-    except (JWTError, ValueError, Exception):
-        await websocket.close(code=4001, reason="Invalid authentication token")
+    except JWTError:
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+    except Exception as e:
+        logger.error(f"WS auth error: {e}")
+        await websocket.close(code=4001, reason="Auth failed")
         return
 
     await ws_manager.connect(user_id, websocket)
     try:
         while True:
-            #     
-            data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
+            try:
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
+            except asyncio.TimeoutError:
+                continue
+            except Exception as e:
+                logger.error(f"WS receive error: {e}")
+                break
             
             chat_id = data.get("chat_id")
             content = data.get("content", "")
             target_user_id = data.get("target_user_id")
 
-            # ============================================
-            # WebRTC сигнализация
-            # ============================================
             if data.get("type") in ["call-start", "call-accept", "call-reject", "call-end", "offer", "answer", "ice-candidate"]:
                 if target_user_id:
                     data["sender_id"] = user_id
                     await ws_manager.broadcast_to_user(target_user_id, data)
                 continue
 
-            # ============================================
-            #  
-            # ============================================
             if data.get("type") == "typing":
                 if chat_id:
-                    await ws_manager.send_to_chat(
-                        chat_id,
-                        {"type": "typing", "user_id": user_id, "chat_id": chat_id},
-                        exclude_user_id=user_id
-                    )
+                    await ws_manager.send_to_chat(chat_id, {"type": "typing", "user_id": user_id, "chat_id": chat_id}, exclude_user_id=user_id)
                 continue
             
-            # ============================================
-            #  
-            # ============================================
             if chat_id is None:
-                logger.warning(f"   chat_id   {user_id}")
                 continue
             
-            # Проверка членства в чате
+            # Save message to DB
             def _db_write():
                 db = SessionLocal()
                 try:
-                    membership = db.query(Membership).filter(
-                        Membership.user_id == user_id,
-                        Membership.chat_id == chat_id
-                    ).first()
-                    
+                    membership = db.query(Membership).filter(Membership.user_id == user_id, Membership.chat_id == chat_id).first()
                     if not membership:
                         return None, "not_member"
-                    
                     db_chat = db.query(Chat).filter(Chat.id == chat_id).first()
                     if not db_chat:
                         return None, "no_chat"
-                    
-                    db_message = Message(
-                        content=content,
-                        sender_id=user_id,
-                        chat_id=chat_id
-                    )
+                    db_message = Message(content=content, sender_id=user_id, chat_id=chat_id)
                     db.add(db_message)
                     db.commit()
                     db.refresh(db_message)
@@ -306,33 +291,20 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""
                 logger.error(f"Message save error: {e}")
                 continue
             
-            if error == "not_member":
-                logger.warning(f"User {user_id} not in chat {chat_id}")
-                continue
-            if error == "no_chat":
-                logger.error(f"Chat {chat_id} does not exist")
+            if error:
                 continue
             
             data["timestamp"] = db_message.timestamp.isoformat()
-            
             data["sender_id"] = user_id
             data["type"] = "new_message"
             
             await ws_manager.send_to_chat(chat_id, data, exclude_user_id=user_id)
 
-            await send_sse_event(user_id, {
-                "type": "message_sent",
-                "chat_id": chat_id,
-                "timestamp": data["timestamp"]
-            })
-            
-    except asyncio.TimeoutError:
-        logger.warning(f"WebSocket timeout for user {user_id}")
-        await ws_manager.disconnect(websocket)
     except WebSocketDisconnect:
         await ws_manager.disconnect(websocket)
     except Exception as e:
-        logger.error(f" WebSocket: {e}")
+        logger.error(f"WebSocket error: {e}")
+        await ws_manager.disconnect(websocket)
         await ws_manager.disconnect(websocket)
 
 # ============================================
