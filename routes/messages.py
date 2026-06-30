@@ -388,9 +388,10 @@ def send_message(
 def get_messages(
     chat_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)]
+    current_user: Annotated[User, Depends(get_current_user)],
+    limit: int = 50,
+    before_id: int = None
 ):
-    # Check if user is member of chat
     membership = db.query(Membership).filter(
         Membership.user_id == current_user.id,
         Membership.chat_id == chat_id
@@ -398,9 +399,15 @@ def get_messages(
     if not membership:
         raise HTTPException(status_code=403, detail="Not a member of this chat")
     
-    messages = db.query(Message).options(
+    query = db.query(Message).options(
         joinedload(Message.sender)
-    ).filter(Message.chat_id == chat_id).order_by(Message.timestamp).all()
+    ).filter(Message.chat_id == chat_id)
+    
+    if before_id:
+        query = query.filter(Message.id < before_id)
+    
+    messages = query.order_by(Message.timestamp.desc()).limit(limit).all()
+    messages.reverse()
     return messages
 
 
