@@ -32,6 +32,7 @@ from routes.payment import router as payment_router
 from routes.drafts import router as drafts_router
 from routes.gamification import router as gamification_router
 from routes.ai import router as ai_router
+from routes.ai_api import router as ai_api_router
 from routes.stories import router as stories_router
 from logging_config import logger
 from middleware.rate_limiter import RateLimiterMiddleware
@@ -83,9 +84,10 @@ async def startup_admin():
     apply_migrations()
     create_system_chats()
     ensure_admin()
+    ensure_ai_models()
     asyncio.create_task(auto_delete_scheduler())
     asyncio.create_task(scheduled_message_sender())
-    logger.info("Startup complete: tables, migrations, admin ensured")
+    logger.info("Startup complete: tables, migrations, admin, AI models ensured")
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -463,6 +465,7 @@ app.include_router(metrics_router)
 app.include_router(drafts_router)
 app.include_router(gamification_router)
 app.include_router(ai_router)
+app.include_router(ai_api_router)
 app.include_router(stories_router)
 
 # ============================================
@@ -880,6 +883,33 @@ def ensure_admin():
                 logger.info(f"{user.username} уже админ")
     except Exception as e:
         logger.error(f"Ошибка назначения админа: {e}")
+    finally:
+        db.close()
+
+def ensure_ai_models():
+    """Создание стандартных AI моделей"""
+    from models import AIModel
+    db = SessionLocal()
+    try:
+        default_models = [
+            ("qwen3.5-4b", "Qwen 3.5 4B", "Быстрая модель для повседневных задач", 4096, 0.0, 0.0),
+            ("qwen3.5-8b", "Qwen 3.5 8B", "Средняя модель с хорошим балансом", 8192, 0.5, 1.0),
+            ("qwen3.5-14b", "Qwen 3.5 14B", "Мощная модель для сложных задач", 16384, 1.0, 2.0),
+            ("llama3.1-8b", "Llama 3.1 8B", "Open source модель от Meta", 8192, 0.3, 0.6),
+            ("llama3.1-70b", "Llama 3.1 70B", "Премиальная модель от Meta", 32768, 3.0, 6.0),
+        ]
+        for name, display, desc, tokens, inp_price, out_price in default_models:
+            existing = db.query(AIModel).filter(AIModel.name == name).first()
+            if not existing:
+                db.add(AIModel(
+                    name=name, display_name=display, description=desc,
+                    max_tokens=tokens, input_price_per_million=inp_price,
+                    output_price_per_million=out_price
+                ))
+        db.commit()
+        logger.info("AI models ensured")
+    except Exception as e:
+        logger.error(f"AI models error: {e}")
     finally:
         db.close()
 

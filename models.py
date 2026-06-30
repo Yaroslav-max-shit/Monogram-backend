@@ -480,3 +480,29 @@ class UserSession(Base):
     is_current = Column(Boolean, default=False)
     is_new = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class AIModel(Base):
+    __tablename__ = "ai_models"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    display_name = Column(String(100), nullable=False)
+    description = Column(Text, default="")
+    max_tokens = Column(Integer, default=4096)
+    input_price_per_million = Column(Float, default=0.0)
+    output_price_per_million = Column(Float, default=0.0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class AIApiKey(Base):
+    __tablename__ = "ai_api_keys"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    key = Column(String(64), unique=True, nullable=False)
+    plan = Column(String(20), default="free")
+    daily_limit = Column(Integer, default=200000)
+    weekly_limit = Column(Integer, default=1200000)
+    daily_used = Column(Integer, default=0)
+    weekly_used = Column(Integer, default=0)
+    last_reset = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

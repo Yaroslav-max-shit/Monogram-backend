@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from database import get_db
-from models import User, Chat, Message, Membership
+from models import User, Chat, Message, Membership, Bot
 from datetime import datetime
 from .auth import get_current_user
 
@@ -42,6 +42,12 @@ def global_search(
         User.last_name.ilike(f"%{q}%")
     ).limit(limit).all()
     
+    # Поиск по ботам
+    bots = db.query(Bot).filter(
+        Bot.name.ilike(f"%{q}%") | 
+        Bot.username.ilike(f"%{q}%")
+    ).limit(limit).all()
+    
     return {
         "chats": [
             {
@@ -71,6 +77,16 @@ def global_search(
                 "avatar_url": u.avatar_url
             }
             for u in users
+        ],
+        "bots": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "username": b.username,
+                "avatar_url": b.avatar_url,
+                "is_verified": True
+            }
+            for b in bots
         ]
     }
 
