@@ -342,6 +342,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""
 
             await ws_manager.send_to_chat(chat_id, data, exclude_user_id=user_id)
 
+            if content.startswith("/"):
+                asyncio.create_task(handle_bot_command(chat_id, user_id, content))
+
     except WebSocketDisconnect:
         pass
     except Exception as e:
@@ -352,7 +355,107 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""
         await ws_manager.disconnect(websocket)
 
 # ============================================
-# SSE ENDPOINT (с аутентификацией)
+# BOT COMMAND HANDLER
+# ============================================
+
+async def handle_bot_command(chat_id: int, user_id: int, content: str):
+    """Обработка команд ботов (/documentation, /start, /help)"""
+    try:
+        db = SessionLocal()
+        from models import Bot, User
+        bot_user = db.query(User).filter(User.is_bot == True).first()
+        if not bot_user:
+            db.close()
+            return
+        bot_creator = db.query(Bot).filter(Bot.username == "BotCreator").first()
+        if not bot_creator:
+            db.close()
+            return
+
+        cmd = content.strip().lower()
+
+        if cmd == "/documentation" or cmd.startswith("/documentation@"):
+            db_msg = Message(
+                content="📚 **Документация Monogram Bot API**\n\nПолная документация по созданию и управлению ботами доступна по ссылке:",
+                sender_id=bot_user.id,
+                chat_id=chat_id,
+                reply_to_id=None,
+            )
+            db.add(db_msg)
+            db.commit()
+            db.refresh(db_msg)
+
+            doc_msg = Message(
+                content='{"type":"bot_command","command":"documentation","buttons":[{"text":"📖 Открыть документацию","action":"open_url","url":"/docs/bot-api"},{"text":"⚙️ Автооткрытие: выкл","action":"toggle_docs"}]}',
+                sender_id=bot_user.id,
+                chat_id=chat_id,
+                reply_to_id=db_msg.id,
+            )
+            db.add(doc_msg)
+            db.commit()
+            db.refresh(doc_msg)
+
+            await ws_manager.send_to_chat(chat_id, {
+                "type": "new_message",
+                "id": db_msg.id,
+                "content": db_msg.content,
+                "sender_id": bot_user.id,
+                "chat_id": chat_id,
+                "timestamp": db_msg.timestamp.isoformat(),
+            })
+            await ws_manager.send_to_chat(chat_id, {
+                "type": "new_message",
+                "id": doc_msg.id,
+                "content": doc_msg.content,
+                "sender_id": bot_user.id,
+                "chat_id": chat_id,
+                "timestamp": doc_msg.timestamp.isoformat(),
+            })
+
+        elif cmd == "/start" or cmd.startswith("/start@"):
+            db_msg = Message(
+                content="👋 Привет! Я BotCreator — официальный бот Monogram.\n\nДоступные команды:\n/newbot — создать нового бота\n/mybots — мои боты\n/setname — имя бота\n/setdescription — описание\n/setavatar — аватар\n/setcommands — команды\n/documentation — документация API\n\nВсё просто: создай бота, настрой, запусти!",
+                sender_id=bot_user.id,
+                chat_id=chat_id,
+            )
+            db.add(db_msg)
+            db.commit()
+            db.refresh(db_msg)
+
+            await ws_manager.send_to_chat(chat_id, {
+                "type": "new_message",
+                "id": db_msg.id,
+                "content": db_msg.content,
+                "sender_id": bot_user.id,
+                "chat_id": chat_id,
+                "timestamp": db_msg.timestamp.isoformat(),
+            })
+
+        elif cmd == "/help" or cmd.startswith("/help@"):
+            db_msg = Message(
+                content="📖 Команды BotCreator:\n\n/newbot — создать нового бота\n/mybots — список моих ботов\n/setname — изменить имя\n/setdescription — изменить описание\n/setavatar — загрузить аватар\n/setcommands — настроить команды\n/regeneratekey — новый ключ API\n/documentation — полная документация",
+                sender_id=bot_user.id,
+                chat_id=chat_id,
+            )
+            db.add(db_msg)
+            db.commit()
+            db.refresh(db_msg)
+
+            await ws_manager.send_to_chat(chat_id, {
+                "type": "new_message",
+                "id": db_msg.id,
+                "content": db_msg.content,
+                "sender_id": bot_user.id,
+                "chat_id": chat_id,
+                "timestamp": db_msg.timestamp.isoformat(),
+            })
+
+        db.close()
+    except Exception as e:
+        logger.error(f"Bot command error: {e}")
+
+# ============================================
+# SSE ENDPOINT
 # ============================================
 
 @app.get("/api/sse/{user_id}")
@@ -813,61 +916,79 @@ def apply_migrations():
             # ============================================
 
 def create_system_chats():
-    """   (, Monogram)"""
+    """Создание системных чатов и ботов"""
+    from models import Bot, User
     db = SessionLocal()
     try:
-        #  "" (id = 999999)
         favorite = db.query(Chat).filter(Chat.id == 999999).first()
         if not favorite:
             favorite = Chat(
                 id=999999,
                 type="private",
-                name="",
-                description=" "
+                name="Избранное",
+                description="Избранные сообщения"
             )
             db.add(favorite)
-            logger.info("   ''")
-        
-        #  "Monogram" (id = 999998)
+            logger.info("Создан чат 'Избранное'")
+
         monogram = db.query(Chat).filter(Chat.id == 999998).first()
         if not monogram:
             monogram = Chat(
                 id=999998,
                 type="channel",
                 name="Monogram",
-                description=" "
+                description="Официальный канал"
             )
             db.add(monogram)
-            logger.info("   'Monogram'")
-            
-            #   
+            logger.info("Создан канал 'Monogram'")
+
             from models import Message, Admin
             user = db.query(User).filter(User.username == "Yar").first()
             if user:
                 admin = db.query(Admin).filter(Admin.user_id == user.id).first()
                 if not admin:
                     db.add(Admin(user_id=user.id))
-                    logger.info("  Yar  ")
-            
+                    logger.info("Yar назначен админом")
+
             db.commit()
-            
-            #  
+
             msgs = [
-                "    Monogram! ",
-                "    :      .",
-                "      .",
-                "   Telegram, WhatsApp  ...",
-                "  QuarkPay    !",
-                "   !",
+                "Добро пожаловать в Monogram! 🚀",
+                "Это официальный канал проекта. Здесь вы узнаете обо всех новостях.",
+                "Новые функции появляются каждую неделю.",
+                "Мы впереди Telegram, WhatsApp и всех...",
+                "QuarkPay уже доступен в приложении!",
+                "Наслаждайтесь мессенджером!",
             ]
             for text in msgs:
                 db.add(Message(content=text, sender_id=1, chat_id=999998))
-            db.commit()
-            logger.info("    Monogram")
-        
+
+        bot_creator = db.query(Bot).filter(Bot.username == "BotCreator").first()
+        if not bot_creator:
+            bot_user = db.query(User).filter(User.username == "monogram_bot").first()
+            if not bot_user:
+                bot_user = User(
+                    username="monogram_bot",
+                    first_name="BotCreator",
+                    last_name="",
+                    is_bot=True,
+                )
+                db.add(bot_user)
+                db.flush()
+            bot_creator = Bot(
+                owner_id=bot_user.id,
+                name="BotCreator",
+                username="BotCreator",
+                description="Официальный бот для создания и управления ботами в Monogram",
+                api_key="botcreator_system_key_2024",
+                is_active=True,
+            )
+            db.add(bot_creator)
+            logger.info("Создан системный бот BotCreator")
+
         db.commit()
     except Exception as e:
-        logger.error(f"   : {e}")
+        logger.error(f"Ошибка создания системных объектов: {e}")
     finally:
         db.close()
 
