@@ -45,7 +45,7 @@ import secrets
 #  FastAPI приложение
 # ============================================
 
-app = FastAPI(title="Monogram Messenger API", version="2.0.0")
+app = FastAPI(title="Monogram Messenger API", version="2.1.0")
 
 async def auto_delete_scheduler():
     while True:
@@ -547,7 +547,7 @@ async def bot_docs():
 
 @app.get("/")
 async def root():
-    return {"message": "Monogram Messenger API",         "version": "2.0.0", "status": "running"}
+    return {"message": "Monogram Messenger API",         "version": "2.1.0", "status": "running"}
 
 # ============================================
 #  
