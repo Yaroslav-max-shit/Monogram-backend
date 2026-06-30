@@ -989,3 +989,89 @@ async def api_deleteWebhook(request: Request, db: Session = Depends(get_db)):
         db.delete(wh)
         db.commit()
     return tg_success(True)
+
+@router.post("/banChatMember")
+async def api_banChatMember(request: Request, db: Session = Depends(get_db)):
+    bot, err = await get_bot(request, db)
+    if err: return err
+    body = await get_body(request)
+    chat_id = body.get("chat_id")
+    user_id = body.get("user_id")
+    if not chat_id or not user_id:
+        return tg_error(400, "Bad Request: chat_id and user_id required")
+    membership = db.query(Membership).filter(Membership.user_id == user_id, Membership.chat_id == chat_id).first()
+    if membership:
+        membership.is_blocked = True
+        db.commit()
+    return tg_success(True)
+
+@router.post("/kickChatMember")
+async def api_kickChatMember(request: Request, db: Session = Depends(get_db)):
+    bot, err = await get_bot(request, db)
+    if err: return err
+    body = await get_body(request)
+    chat_id = body.get("chat_id")
+    user_id = body.get("user_id")
+    if not chat_id or not user_id:
+        return tg_error(400, "Bad Request: chat_id and user_id required")
+    membership = db.query(Membership).filter(Membership.user_id == user_id, Membership.chat_id == chat_id).first()
+    if membership:
+        db.delete(membership)
+        db.commit()
+    return tg_success(True)
+
+@router.post("/restrictChatMember")
+async def api_restrictChatMember(request: Request, db: Session = Depends(get_db)):
+    bot, err = await get_bot(request, db)
+    if err: return err
+    body = await get_body(request)
+    chat_id = body.get("chat_id")
+    user_id = body.get("user_id")
+    until_date = body.get("until_date")
+    if not chat_id or not user_id:
+        return tg_error(400, "Bad Request: chat_id and user_id required")
+    membership = db.query(Membership).filter(Membership.user_id == user_id, Membership.chat_id == chat_id).first()
+    if membership:
+        membership.is_muted = True
+        if until_date:
+            from datetime import datetime
+            membership.muted_until = datetime.fromisoformat(until_date)
+        db.commit()
+    return tg_success(True)
+
+@router.post("/promoteChatMember")
+async def api_promoteChatMember(request: Request, db: Session = Depends(get_db)):
+    bot, err = await get_bot(request, db)
+    if err: return err
+    body = await get_body(request)
+    chat_id = body.get("chat_id")
+    user_id = body.get("user_id")
+    if not chat_id or not user_id:
+        return tg_error(400, "Bad Request: chat_id and user_id required")
+    membership = db.query(Membership).filter(Membership.user_id == user_id, Membership.chat_id == chat_id).first()
+    if membership:
+        membership.role = "admin"
+        db.commit()
+    return tg_success(True)
+
+@router.post("/sendInvoice")
+async def api_sendInvoice(request: Request, db: Session = Depends(get_db)):
+    bot, err = await get_bot(request, db)
+    if err: return err
+    body = await get_body(request)
+    chat_id = body.get("chat_id")
+    title = body.get("title", "")
+    description = body.get("description", "")
+    amount = body.get("amount", 0)
+    if not chat_id or not amount:
+        return tg_error(400, "Bad Request: chat_id and amount required")
+    invoice_msg = Message(
+        content=json.dumps({"type": "invoice", "title": title, "description": description, "amount": amount, "currency": "RUB"}),
+        sender_id=bot.owner_id,
+        chat_id=chat_id,
+        bot_id=bot.id
+    )
+    db.add(invoice_msg)
+    db.commit()
+    db.refresh(invoice_msg)
+    return tg_success({"message_id": invoice_msg.id, "chat_id": chat_id})

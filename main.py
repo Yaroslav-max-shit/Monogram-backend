@@ -46,12 +46,45 @@ import secrets
 
 app = FastAPI(title="Monogram Messenger API", version="1.0.0")
 
+async def auto_delete_scheduler():
+    while True:
+        try:
+            db = SessionLocal()
+            from models import Message as Msg
+            now = datetime.utcnow()
+            deleted = db.query(Msg).filter(Msg.auto_delete_at != None, Msg.auto_delete_at <= now).delete()
+            if deleted:
+                db.commit()
+                logger.info(f"Auto-deleted {deleted} messages")
+            db.close()
+        except Exception as e:
+            logger.error(f"Auto-delete error: {e}")
+        await asyncio.sleep(30)
+
+async def scheduled_message_sender():
+    while True:
+        try:
+            db = SessionLocal()
+            from models import Message as Msg
+            now = datetime.utcnow()
+            pending = db.query(Msg).filter(Msg.scheduled_for != None, Msg.scheduled_for <= now, Msg.is_deleted == False).all()
+            for msg in pending:
+                msg.scheduled_for = None
+                db.commit()
+                logger.info(f"Sent scheduled message {msg.id}")
+            db.close()
+        except Exception as e:
+            logger.error(f"Scheduler error: {e}")
+        await asyncio.sleep(30)
+
 @app.on_event("startup")
 async def startup_admin():
     create_tables()
     apply_migrations()
     create_system_chats()
     ensure_admin()
+    asyncio.create_task(auto_delete_scheduler())
+    asyncio.create_task(scheduled_message_sender())
     logger.info("Startup complete: tables, migrations, admin ensured")
 
 @app.exception_handler(HTTPException)
@@ -214,37 +247,41 @@ async def send_sse_event(user_id: int, event: dict):
 
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""):
-    # Authenticate WebSocket via query param token
     if not token:
         token = websocket.query_params.get("token", "")
     if not token:
-        await websocket.close(code=4001, reason="Missing authentication token")
+        await websocket.close(code=4001, reason="Missing token")
         return
     try:
         from jose import jwt, JWTError
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         token_user_id = int(payload.get("user_id") or payload.get("sub", 0))
         if token_user_id != user_id:
-            await websocket.close(code=4003, reason="Token user_id mismatch")
+            await websocket.close(code=4003, reason="User mismatch")
             return
-    except JWTError:
+    except Exception:
         await websocket.close(code=4001, reason="Invalid token")
-        return
-    except Exception as e:
-        logger.error(f"WS auth error: {e}")
-        await websocket.close(code=4001, reason="Auth failed")
         return
 
     await ws_manager.connect(user_id, websocket)
+    
+    async def keepalive():
+        while True:
+            try:
+                await asyncio.sleep(30)
+                if websocket.client_state.name == "CONNECTED":
+                    await websocket.send_json({"type": "ping"})
+            except Exception:
+                break
+    
+    keepalive_task = asyncio.create_task(keepalive())
+    
     try:
         while True:
             try:
-                data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=120.0)
             except asyncio.TimeoutError:
                 continue
-            except Exception as e:
-                logger.error(f"WS receive error: {e}")
-                break
             
             chat_id = data.get("chat_id")
             content = data.get("content", "")
@@ -260,11 +297,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""
                 if chat_id:
                     await ws_manager.send_to_chat(chat_id, {"type": "typing", "user_id": user_id, "chat_id": chat_id}, exclude_user_id=user_id)
                 continue
-            
+
             if chat_id is None:
                 continue
-            
-            # Save message to DB
+
             def _db_write():
                 db = SessionLocal()
                 try:
@@ -288,22 +324,24 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""
             try:
                 db_message, error = await asyncio.to_thread(_db_write)
             except Exception as e:
-                logger.error(f"Message save error: {e}")
+                logger.error(f"WS db error: {e}")
                 continue
-            
+
             if error:
                 continue
-            
+
             data["timestamp"] = db_message.timestamp.isoformat()
             data["sender_id"] = user_id
             data["type"] = "new_message"
-            
+
             await ws_manager.send_to_chat(chat_id, data, exclude_user_id=user_id)
 
     except WebSocketDisconnect:
-        await ws_manager.disconnect(websocket)
+        pass
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        logger.error(f"WS error: {e}")
+    finally:
+        keepalive_task.cancel()
         await ws_manager.disconnect(websocket)
         await ws_manager.disconnect(websocket)
 
@@ -507,6 +545,12 @@ def apply_migrations():
             db.commit()
         if 'reactions_json' not in msg_columns:
             db.execute(text("ALTER TABLE messages ADD COLUMN reactions_json TEXT DEFAULT '{}'"))
+            db.commit()
+        if 'is_pinned' not in msg_columns:
+            db.execute(text("ALTER TABLE messages ADD COLUMN is_pinned BOOLEAN DEFAULT 0"))
+            db.commit()
+        if 'auto_delete_at' not in msg_columns:
+            db.execute(text("ALTER TABLE messages ADD COLUMN auto_delete_at TIMESTAMP DEFAULT NULL"))
             db.commit()
         
         #   emoji_status, emoji_status_expires  users

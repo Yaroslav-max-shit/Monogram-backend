@@ -104,6 +104,8 @@ class Message(Base):
     delivered_at = Column(DateTime, nullable=True)
     edited_at = Column(DateTime, nullable=True)
     reactions_json = Column(Text, default="{}")
+    is_pinned = Column(Boolean, default=False)
+    auto_delete_at = Column(DateTime, nullable=True)
     
     bot = relationship("Bot", back_populates="messages")
     sender = relationship("User", back_populates="messages")
@@ -291,6 +293,14 @@ class Folder(Base):
     name = Column(String(100), nullable=False)
     chat_ids = Column(Text, default="[]")  # JSON
     icon = Column(String(50), default="folder")
+
+class QuickReply(Base):
+    __tablename__ = "quick_replies"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    shortcut = Column(String(50), nullable=False)
+    text = Column(Text, nullable=False)
+    category = Column(String(50), default="general")
 
 class SavedMessage(Base):
     __tablename__ = "saved_messages"

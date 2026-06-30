@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from typing import Annotated, List
 from database import get_db
-from models import Chat, Membership, User, Message
+from models import Chat, Membership, User, Message, Folder
 from schemas import ChatCreate, ChatResponse
 from .auth import get_current_user
 import logging
@@ -636,3 +636,21 @@ def get_chat_media(
                     })
 
     return {"items": result}
+
+@router.get("/folders")
+def get_folders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    folders = db.query(Folder).filter(Folder.user_id == current_user.id).all()
+    import json
+    return [{"id": f.id, "name": f.name, "chat_ids": json.loads(f.chat_ids), "icon": f.icon} for f in folders]
+
+@router.post("/folders")
+def create_folder(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    import json
+    name = data.get("name", "Новая папка")
+    chat_ids = json.dumps(data.get("chat_ids", []))
+    icon = data.get("icon", "folder")
+    folder = Folder(user_id=current_user.id, name=name, chat_ids=chat_ids, icon=icon)
+    db.add(folder)
+    db.commit()
+    db.refresh(folder)
+    return {"id": folder.id, "name": folder.name, "icon": folder.icon}

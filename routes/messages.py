@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session, joinedload
 from typing import Annotated
 from database import get_db
-from models import Message, Chat, User, Membership, ScheduledMessage, Notification
+from models import Message, Chat, User, Membership, ScheduledMessage, Notification, QuickReply
 from schemas import MessageCreate, MessageResponse
 from .auth import get_current_user
 import json
@@ -618,3 +618,78 @@ def mark_notification_read(
     notification.is_read = True
     db.commit()
     return {"status": "ok"}
+
+@router.post("/{message_id}/pin")
+def pin_message(message_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    msg = db.query(Message).filter(Message.id == message_id).first()
+    if not msg:
+        raise HTTPException(404, "Сообщение не найдено")
+    membership = db.query(Membership).filter(Membership.user_id == current_user.id, Membership.chat_id == msg.chat_id, Membership.role.in_(["admin", "owner"])).first()
+    if not membership:
+        raise HTTPException(403, "Нет прав")
+    msg.is_pinned = not msg.is_pinned
+    db.commit()
+    return {"is_pinned": msg.is_pinned}
+
+@router.get("/search")
+def search_messages(q: str, chat_id: int = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    query = db.query(Message).filter(Message.content.ilike(f"%{q}%"), Message.is_deleted == False)
+    if chat_id:
+        query = query.filter(Message.chat_id == chat_id)
+    else:
+        user_chat_ids = [m.chat_id for m in db.query(Membership).filter(Membership.user_id == current_user.id).all()]
+        query = query.filter(Message.chat_id.in_(user_chat_ids))
+    messages = query.order_by(Message.timestamp.desc()).limit(50).all()
+    return [{"id": m.id, "content": m.content, "chat_id": m.chat_id, "sender_id": m.sender_id, "timestamp": m.timestamp.isoformat()} for m in messages]
+
+@router.post("/schedule")
+def schedule_message(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from datetime import datetime
+    content = data.get("content", "")
+    chat_id = data.get("chat_id")
+    send_at_str = data.get("send_at")
+    if not content or not chat_id or not send_at_str:
+        raise HTTPException(400, "Заполните все поля")
+    send_at = datetime.fromisoformat(send_at_str)
+    msg = Message(content=content, sender_id=current_user.id, chat_id=chat_id, scheduled_for=send_at)
+    db.add(msg)
+    db.commit()
+    return {"status": "scheduled", "send_at": send_at.isoformat()}
+
+@router.post("/{message_id}/auto-delete")
+def set_auto_delete(message_id: int, data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    msg = db.query(Message).filter(Message.id == message_id, Message.sender_id == current_user.id).first()
+    if not msg:
+        raise HTTPException(404, "Сообщение не найдено")
+    seconds = data.get("seconds", 60)
+    from datetime import timedelta
+    msg.auto_delete_at = datetime.utcnow() + timedelta(seconds=seconds)
+    db.commit()
+    return {"status": "ok", "auto_delete_at": msg.auto_delete_at.isoformat()}
+
+@router.get("/quick-replies")
+def get_quick_replies(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    replies = db.query(QuickReply).filter(QuickReply.user_id == current_user.id).all()
+    return [{"id": r.id, "shortcut": r.shortcut, "text": r.text, "category": r.category} for r in replies]
+
+@router.post("/quick-replies")
+def create_quick_reply(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    shortcut = data.get("shortcut", "")
+    text = data.get("text", "")
+    category = data.get("category", "general")
+    if not shortcut or not text:
+        raise HTTPException(400, "Заполните все поля")
+    reply = QuickReply(user_id=current_user.id, shortcut=shortcut, text=text, category=category)
+    db.add(reply)
+    db.commit()
+    db.refresh(reply)
+    return {"id": reply.id, "shortcut": reply.shortcut, "text": reply.text, "category": reply.category}
+
+@router.delete("/quick-replies/{reply_id}")
+def delete_quick_reply(reply_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    reply = db.query(QuickReply).filter(QuickReply.id == reply_id, QuickReply.user_id == current_user.id).first()
+    if not reply:
+        raise HTTPException(404, "Шаблон не найден")
+    db.delete(reply)
+    db.commit()
+    return {"status": "deleted"}
