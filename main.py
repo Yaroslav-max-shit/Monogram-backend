@@ -284,7 +284,11 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = ""
                 data = await asyncio.wait_for(websocket.receive_json(), timeout=120.0)
             except asyncio.TimeoutError:
                 continue
-            
+
+            if data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+
             chat_id = data.get("chat_id")
             content = data.get("content", "")
             target_user_id = data.get("target_user_id")
