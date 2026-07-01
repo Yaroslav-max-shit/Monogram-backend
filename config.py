@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = False
 
     # CORS
-    CORS_ORIGINS_STR: str = "https://monograme.netlify.app/"
+    CORS_ORIGINS_STR: str = "https://monogram-one-mu.vercel.app/"
 
     @property
     def CORS_ORIGINS(self) -> List[str]:
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
         {"urls": "stun:stun1.l.google.com:19302"},
     ]
 
-    FRONTEND_URL: str = "https://monograme.netlify.app/"
+    FRONTEND_URL: str = "https://monogram-one-mu.vercel.app/"
 
     # JWT Cookie
     JWT_COOKIE_NAME: str = "access_token"

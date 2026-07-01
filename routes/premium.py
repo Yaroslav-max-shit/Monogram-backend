@@ -49,7 +49,7 @@ async def subscribe_to_premium(
     secret_key = os.getenv("YOOMONEY_SECRET_KEY", "")
     if not shop_id:
         raise HTTPException(500, "YOOMONEY_SHOP_ID not configured")
-    return_url = os.getenv("FRONTEND_URL", "https://monograme.netlify.app/") + "/payment/success"
+    return_url = os.getenv("FRONTEND_URL", "https://monogram-one-mu.vercel.app/") + "/payment/success"
     idempotence_key = str(uuid.uuid4())
     async with httpx.AsyncClient() as client:
         response = await client.post(
